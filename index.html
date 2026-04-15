@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Comersio Nota</title>
+
+<style>
+body {
+    font-family: Arial;
+    background:#0d0d0d;
+    color:#fff;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+    flex-direction:column;
+
+    background-image:url('Comérsio.png');
+    background-repeat:no-repeat;
+    background-position:top right;
+    background-size:120px;
+}
+
+.card {
+    width:340px;
+    background:#111;
+    border-radius:20px;
+    padding:15px;
+    border:2px solid #1e3a8a;
+}
+
+.header-inside {
+    text-align:center;
+    margin-bottom:10px;
+}
+
+.subtitle { font-size:14px; color:#aaa; }
+
+.section {
+    border:2px solid #1e3a8a;
+    border-radius:20px;
+    padding:15px;
+}
+
+.row {
+    display:flex;
+    justify-content:space-between;
+    margin-bottom:6px;
+}
+
+.small { font-size:12px; color:#aaa; }
+
+.qr-box {
+    border:2px solid #1e3a8a;
+    border-radius:20px;
+    padding:15px;
+    margin-top:15px;
+    text-align:center;
+}
+
+.qr-box img {
+    width:180px;
+    margin-top:10px;
+    padding:10px;
+    border:2px solid #1e3a8a;
+    border-radius:12px;
+    background:#fff;
+}
+
+.modal {
+    position:fixed;
+    width:100%; height:100%;
+    background:rgba(0,0,0,0.9);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.modal-content {
+    background:#222;
+    padding:20px;
+    width:320px;
+    border-radius:10px;
+    max-height:90vh;
+    overflow-y:auto;
+}
+
+input, select {
+    width:100%;
+    margin-bottom:6px;
+    padding:6px;
+    background:#111;
+    color:#fff;
+    border:1px solid #444;
+}
+
+button {
+    width:100%;
+    padding:8px;
+    background:#1e3a8a;
+    color:#fff;
+    border:none;
+    margin-top:4px;
+}
+
+.item-group {
+    border-bottom:1px dashed #444;
+    margin-bottom:10px;
+    padding-bottom:10px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="modal" id="modal">
+<div class="modal-content">
+
+<h3>Input Barang</h3>
+
+<input type="text" id="custID" placeholder="ID Customer">
+
+<select id="currency">
+<option value="IDR">IDR</option>
+<option value="USD">USD</option>
+<option value="EUR">EUR</option>
+<option value="CNY">CNY</option>
+<option value="GBP">GBP</option>
+</select>
+
+<div id="items"></div>
+
+<button onclick="tambahItem()">+ Tambah Barang</button>
+
+<h4>List Item</h4>
+<div id="previewList" style="max-height:150px;overflow-y:auto;"></div>
+
+<input type="number" id="diskon" placeholder="Diskon">
+
+<select id="payment" onchange="updatePaymentOptions()">
+<option value="Cash">Cash</option>
+<option value="QRIS">QRIS</option>
+<option value="Transfer">Transfer Bank</option>
+<option value="Ewallet">eWallet</option>
+</select>
+
+<div id="subPayment"></div>
+
+<button onclick="generateNota()">Generate</button>
+
+</div>
+</div>
+
+<div class="card" id="nota" style="display:none;">
+
+<div class="header-inside">
+<h2>Konfirmasi Pembayaran</h2>
+<div class="subtitle">Detail Bill</div>
+</div>
+
+<div class="section">
+
+<div class="row small">
+<span>ID Cust</span>
+<span id="custView"></span>
+</div>
+
+<div class="row small">
+<span>Billing Time</span>
+<span id="waktu"></span>
+</div>
+
+<br>
+
+<div id="list"></div>
+
+<br>
+
+<div class="row">
+<span>Discount</span>
+<span id="diskonView"></span>
+</div>
+
+<div class="row">
+<b>Total</b>
+<b id="total"></b>
+</div>
+
+<br>
+
+<div class="row">
+<span>Pembayaran via</span>
+<span id="metode"></span>
+</div>
+
+</div>
+
+<div id="paymentInfo"></div>
+
+<div class="small" style="text-align:center;margin-top:10px;">
+Terimakasih telah bertransaksi dengan kami :)
+</div>
+
+<br>
+
+<div style="text-align:center;font-size:12px;color:#aaa;">
+<b>Comérsio ID</b><br>
+Jl. Taman Nyiur RT03/RW15,<br>
+Tanjung Priok, Jakarta Utara
+</div>
+
+</div>
+
+<script>
+
+let itemsData=[];
+
+const paymentData = {
+Transfer: {
+"SeaBank":"901677273030 An E••• P••••••",
+"BRI":"696101033719531 An E••• P••••••",
+"Bank Jago":"100626307457 An E••• P••••••"
+},
+Ewallet: {
+"GoPay":"083874854586 An E••• P••••••",
+"DANA":"081226672073 An E••• P••••••",
+"ShopeePay":"083874854586 An E••• P••••••"
+}
+};
+
+function formatCurrency(a){
+let cur=document.getElementById("currency").value;
+return cur+" "+a.toLocaleString('id-ID');
+}
+
+function updatePaymentOptions(){
+let type=document.getElementById("payment").value;
+let sub=document.getElementById("subPayment");
+
+if(type==="Transfer"){
+sub.innerHTML=`<select id="paymentDetail">
+<option>SeaBank</option>
+<option>BRI</option>
+<option>Bank Jago</option>
+</select>`;
+}
+else if(type==="Ewallet"){
+sub.innerHTML=`<select id="paymentDetail">
+<option>GoPay</option>
+<option>DANA</option>
+<option>ShopeePay</option>
+</select>`;
+}
+else{
+sub.innerHTML="";
+}
+}
+
+function generateNominalOptions(){
+let html="";
+for(let i=10000;i<=200000;i+=5000){
+html+=`<option value="${i}">${i.toLocaleString('id-ID')}</option>`;
+}
+return html;
+}
+
+function tambahItem(){
+let div=document.createElement("div");
+div.classList.add("item-group");
+
+div.innerHTML=`
+<select class="type">
+<option value="manual">Item</option>
+<option value="ewallet">eWallet</option>
+<option value="voucher">Voucher</option>
+</select>
+
+<div class="manual">
+<input class="nama" placeholder="Nama">
+<input class="harga" type="number" placeholder="Harga">
+</div>
+
+<div class="ewallet" style="display:none;">
+<select class="wallet">
+<option>GoPay</option>
+<option>OVO</option>
+<option>DANA</option>
+<option>ShopeePay</option>
+</select>
+<select class="nominal">${generateNominalOptions()}</select>
+<input class="customNominal" type="number" placeholder="Manual">
+</div>
+
+<div class="voucher" style="display:none;">
+<input class="kodeVoucher" placeholder="Kode Voucher">
+<input class="hargaVoucher" type="number" placeholder="Harga">
+</div>
+
+<button onclick="saveItem(this)">Simpan</button>
+`;
+
+div.querySelector(".type").onchange=function(){
+let t=this.value;
+div.querySelector(".manual").style.display=t==="manual"?"block":"none";
+div.querySelector(".ewallet").style.display=t==="ewallet"?"block":"none";
+div.querySelector(".voucher").style.display=t==="voucher"?"block":"none";
+};
+
+document.getElementById("items").appendChild(div);
+}
+
+function saveItem(btn){
+let div=btn.closest(".item-group");
+let type=div.querySelector(".type").value;
+let data={type};
+
+if(type==="manual"){
+data.nama=div.querySelector(".nama").value;
+data.harga=parseInt(div.querySelector(".harga").value)||0;
+}
+
+if(type==="ewallet"){
+let w=div.querySelector(".wallet").value;
+let n=div.querySelector(".customNominal").value || div.querySelector(".nominal").value;
+if(w&&n){
+data.nama=w+" "+parseInt(n).toLocaleString('id-ID');
+data.harga=parseInt(n)+3000;
+}
+}
+
+if(type==="voucher"){
+let k=div.querySelector(".kodeVoucher").value;
+let h=parseInt(div.querySelector(".hargaVoucher").value)||0;
+if(k){
+data.nama="Voucher ("+k+")";
+data.harga=h;
+}
+}
+
+itemsData.push(data);
+renderPreview();
+div.remove();
+}
+
+function renderPreview(){
+let html="";
+itemsData.forEach((item,i)=>{
+html+=`
+<div style="margin-bottom:8px;border-bottom:1px dashed #444;padding-bottom:5px;">
+${item.nama} - ${formatCurrency(item.harga)}
+<button onclick="editItem(${i})">Edit</button>
+<button onclick="deleteItem(${i})">Hapus</button>
+</div>`;
+});
+document.getElementById("previewList").innerHTML=html;
+}
+
+function deleteItem(i){
+itemsData.splice(i,1);
+renderPreview();
+}
+
+function editItem(i){
+let item=itemsData[i];
+tambahItem();
+deleteItem(i);
+}
+
+function generateNota(){
+
+let subtotal=0;
+let html="";
+let custID=document.getElementById("custID").value;
+
+itemsData.forEach(item=>{
+subtotal+=item.harga;
+html+=`<div class="row"><span>• ${item.nama}</span><span>${formatCurrency(item.harga)}</span></div>`;
+});
+
+let diskon=parseInt(document.getElementById("diskon").value)||0;
+let total=subtotal-diskon;
+let metode=document.getElementById("payment").value;
+let detail=document.getElementById("paymentDetail")?.value;
+
+document.getElementById("custView").innerText=custID||"-";
+document.getElementById("list").innerHTML=html;
+document.getElementById("diskonView").innerText=formatCurrency(diskon);
+document.getElementById("total").innerText=formatCurrency(total);
+document.getElementById("metode").innerText=metode;
+document.getElementById("waktu").innerText=new Date().toLocaleString("id-ID");
+
+let payHTML="";
+
+if(metode==="QRIS"){
+payHTML=`<div class="qr-box">
+<div class="small" style="margin-bottom:10px;">Scan QRIS</div>
+<img src="QRIS.png">
+</div>`;
+}
+else if(metode==="Transfer"){
+payHTML=`<div class="qr-box">
+<div>${detail}</div>
+<div class="small">${paymentData.Transfer[detail]}</div>
+</div>`;
+}
+else if(metode==="Ewallet"){
+payHTML=`<div class="qr-box">
+<div>${detail}</div>
+<div class="small">${paymentData.Ewallet[detail]}</div>
+</div>`;
+}
+
+document.getElementById("paymentInfo").innerHTML=payHTML;
+
+document.getElementById("modal").style.display="none";
+document.getElementById("nota").style.display="block";
+}
+
+tambahItem();
+
+</script>
+
+</body>
+</html>
